@@ -88,15 +88,14 @@ module Parser =
 
         Parser innerFn
 
-    let (|>>) = mapP
+    let (|>>) x f = mapP f x
 
     let returnP x =
         let innerFn input = Success(x, input)
 
         Parser innerFn
 
-    let applyP fP fx =
-        (fP .>>. fx) |> mapP (fun (f, x) -> f x)
+    let applyP fP fx = (fP .>>. fx) |>> (fun (f, x) -> f x)
 
     let (<*>) = applyP
 
@@ -113,4 +112,80 @@ module Parser =
     let charListToStr charList = charList |> List.toArray |> String
 
     let pString str =
-        str |> List.ofSeq |> List.map pChar |> sequence |> mapP charListToStr
+        str |> List.ofSeq |> List.map pChar |> sequence |>> charListToStr
+
+    let rec parserZeroOrMore parser input =
+        let firstResult = run parser input
+
+        match firstResult with
+        | Success (firstValue, firstRemaining) ->
+            let secondValue, secondRemaining = parserZeroOrMore parser firstRemaining
+
+            (firstValue :: secondValue, secondRemaining)
+
+        | Failure _ -> ([], input)
+
+    let many parser =
+        let innerFn input =
+            let result = parserZeroOrMore parser input
+            Success(result)
+
+        Parser innerFn
+
+    let many1 parser =
+        let innerFn input =
+            let result = parserZeroOrMore parser input
+
+            match result with
+            | [], _ -> Failure "errr"
+            | _ -> Success(result)
+
+        Parser innerFn
+
+
+    let opt p =
+        let some = p |>> Some
+        let none = returnP None
+        some <|> none
+
+    let pInt =
+        let intToStr (sign, digitsList) =
+            let i = digitsList |> List.toArray |> String |> int
+
+            match sign with
+            | Some _ -> -i
+            | None -> i
+
+        let digit = anyOf [ '0' .. '9' ]
+
+        let digits = many1 digit
+
+        opt (pChar '-') .>>. digits |>> intToStr
+
+    let (.>>) p1 p2 = p1 .>>. p2 |>> fst
+
+    let (>>.) p1 p2 = p1 .>>. p2 |>> snd
+
+    let between p1 p2 p3 = p1 >>. p2 .>> p3
+
+    let sepBy1 p sep =
+        let sepThenP = sep >>. p
+        p .>>. many sepThenP |>> fun (p, pList) -> p :: pList
+
+    let sepBy p sep = sepBy1 p sep <|> returnP []
+
+    let bindP f p =
+        let innerFn input =
+            let result1 = run p input
+
+            match result1 with
+            | Failure err ->
+
+                Failure err
+            | Success (value1, remainingInput) ->
+
+                let p2 = f value1
+
+                run p2 remainingInput
+
+        Parser innerFn

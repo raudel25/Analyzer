@@ -25,7 +25,22 @@ let z = run parseABC "ABCDE" // Success ("ABC", "DE")
 let t = run parseABC "A|CDE" // Failure "Expecting 'B'. Got '|'"
 let v = run parseABC "AB|DE" // Failure "Expecting 'C'. Got '|'"
 
+let digit = anyOf [ '0' .. '9' ]
+
+// define parser for one or more digits
+let digits = pInt
+
+let p = run digits "-45BC" // Success (['1'], "ABC")
+
+// let digit = anyOf [ '0' .. '9' ]
+
+// use .>> below
+let digitThenSemicolon = digit .>> opt (pChar ';')
+
+let aa = run digitThenSemicolon "1;" // Success ('1', "")
+let bb = run digitThenSemicolon "1" // Success ('1', "")
+
 let charFunc =
-    match v with
-    | Success (a, b) -> printfn $"success %s{a} %s{b}"
+    match bb with
+    | Success (a, b) -> printfn $"success %c{a} %s{b}"
     | Failure e -> printf $"err: %s{e}"
