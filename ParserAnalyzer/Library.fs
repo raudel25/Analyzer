@@ -73,3 +73,44 @@ module Parser =
     let choice listOfParsers = List.reduce (<|>) listOfParsers
 
     let anyOf listOfChars = listOfChars |> List.map pChar |> choice
+
+    let mapP f parser =
+        let innerFn input =
+            let result = run parser input
+
+            match result with
+            | Success (value, remaining) ->
+                let newValue = f value
+
+                Success(newValue, remaining)
+
+            | Failure err -> Failure err
+
+        Parser innerFn
+
+    let (|>>) = mapP
+
+    let returnP x =
+        let innerFn input = Success(x, input)
+
+        Parser innerFn
+
+    let applyP fP fx =
+        (fP .>>. fx) |> mapP (fun (f, x) -> f x)
+
+    let (<*>) = applyP
+
+    let lift2 f xP yP = returnP f <*> xP <*> yP
+
+    let rec sequence parserList =
+
+        let cons head tail = head :: tail
+
+        match parserList with
+        | [] -> returnP []
+        | head :: tail -> lift2 cons head (sequence tail)
+
+    let charListToStr charList = charList |> List.toArray |> String
+
+    let pString str =
+        str |> List.ofSeq |> List.map pChar |> sequence |> mapP charListToStr
