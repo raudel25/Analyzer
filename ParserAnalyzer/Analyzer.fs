@@ -2,29 +2,32 @@
 
 open System
 
-module Parser =
+type ParserLabel = string
+type ParserError = string
 
-    type ParserLabel = string
-    type ParserError = string
+type ParserPosition =
+    { currentLine: string
+      line: int
+      column: int }
 
-    type ParserPosition =
-        { currentLine: string
-          line: int
-          column: int }
+type Position = { line: int; column: int }
 
-    type ParseResult<'a> =
-        | Success of 'a
-        | Failure of ParserLabel * ParserError * ParserPosition
+type InputState = { lines: string[]; position: Position }
 
-    type Position = { line: int; column: int }
+type ParseResult<'a> =
+    | Success of 'a
+    | Failure of ParserLabel * ParserError * ParserPosition
 
+type Parser<'a> =
+    { parseFn: InputState -> ParseResult<'a * InputState>
+      label: ParserLabel }
+
+module Input =
     let initialPos = { line = 0; column = 0 }
 
     let incrCol (pos: Position) = { pos with column = pos.column + 1 }
 
     let incrLine pos = { line = pos.line + 1; column = 0 }
-
-    type InputState = { lines: string[]; position: Position }
 
     let fromStr str =
         if String.IsNullOrEmpty(str) then
@@ -62,13 +65,16 @@ module Parser =
                 let newState = { input with position = newPos }
                 newState, Some char
 
-    type Parser<'a> =
-        { parseFn: InputState -> ParseResult<'a * InputState>
-          label: ParserLabel }
+    let parserPositionFromInputState (inputState: InputState) =
+        { currentLine = currentLine inputState
+          line = inputState.position.line
+          column = inputState.position.column }
 
+module Analyzer =
     let runOnInput parser input = parser.parseFn input
 
-    let run parser inputStr = runOnInput parser (fromStr inputStr)
+    let run parser inputStr =
+        runOnInput parser (Input.fromStr inputStr)
 
     let printResult result =
         match result with
@@ -79,11 +85,6 @@ module Parser =
             let linePos = pos.line
             let failureCaret = sprintf "%*s^%s" colPos "" error
             printfn $"Line:%i{linePos} Col:%i{colPos} Error parsing %s{label}\n%s{errorLine}\n%s{failureCaret}"
-
-    let parserPositionFromInputState (inputState: InputState) =
-        { currentLine = currentLine inputState
-          line = inputState.position.line
-          column = inputState.position.column }
 
     let setLabel parser newLabel =
         let newInnerFn input =
@@ -102,12 +103,12 @@ module Parser =
 
     let satisfy predicate label =
         let innerFn input =
-            let remainingInput, charOpt = nextChar input
+            let remainingInput, charOpt = Input.nextChar input
 
             match charOpt with
             | None ->
                 let err = "No more input"
-                let pos = parserPositionFromInputState input
+                let pos = Input.parserPositionFromInputState input
 
                 Failure(label, err, pos)
             | Some first ->
@@ -115,7 +116,7 @@ module Parser =
                     Success(first, remainingInput)
                 else
                     let err = $"Unexpected '%c{first}'"
-                    let pos = parserPositionFromInputState input
+                    let pos = Input.parserPositionFromInputState input
 
                     Failure(label, err, pos)
 
@@ -314,13 +315,13 @@ module Parser =
 
         opt (pChar '-') .>>. digits .>>. pChar '.' .>>. digits |> mapP resultToFloat
         <?> label
-        
-        
+
+
     let whitespaceChar =
-      let predicate = Char.IsWhiteSpace
-      let label = "whitespace"
-      satisfy predicate label
-    
+        let predicate = Char.IsWhiteSpace
+        let label = "whitespace"
+        satisfy predicate label
+
     let spaces = many whitespaceChar
-    
+
     let spaces1 = many1 whitespaceChar

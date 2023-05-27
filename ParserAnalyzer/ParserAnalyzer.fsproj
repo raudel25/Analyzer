@@ -3,11 +3,12 @@
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
-        <RootNamespace>ParserAnalizer</RootNamespace>
+        <RootNamespace>ParserAnalyzer</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-        <Compile Include="Parser.fs" />
+        <Compile Include="Analyzer.fs" />
+        <Compile Include="JSONParser.fs" />
     </ItemGroup>
 
 </Project>
