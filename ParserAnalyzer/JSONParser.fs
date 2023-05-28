@@ -59,3 +59,5 @@ module JSON =
         quote >>. manyChars jChar .>> quote
 
     let jString = quotedString <?> "quoted string" |>> JString
+
+    let jNumber = (mapP (fun (n: int) -> float n) pInt <|> pFloat) <?> "number"
